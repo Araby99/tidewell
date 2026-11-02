@@ -1,0 +1,25 @@
+# Written by `npx livelocale init --share`. Turns LiveLocale change links into pull requests.
+# livelocale reads the link from the event file; it never reaches a shell command.
+name: LiveLocale
+on:
+  issues: { types: [opened] }
+  issue_comment: { types: [created] }
+  pull_request: { types: [closed] }
+  workflow_dispatch: { inputs: { link: { description: 'LiveLocale change link', required: true } } }
+permissions: { contents: write, pull-requests: write, issues: write }
+concurrency: { group: 'livelocale-${{ github.event.issue.number || github.run_id }}', queue: max }
+jobs:
+  apply:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && contains(github.event.issue.body, '```livelocale')) ||
+      (github.event_name == 'issue_comment' && !github.event.issue.pull_request &&
+       startsWith(github.event.comment.body, '/livelocale')) ||
+      (github.event_name == 'pull_request' && startsWith(github.event.pull_request.head.ref, 'livelocale/issue-') &&
+       github.event.pull_request.base.ref != github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with: { persist-credentials: false }
+      - run: npx --yes livelocale@0.10.1 apply --github-event --locales locales --source en --branches main
+        env: { GITHUB_TOKEN: '${{ github.token }}' }
